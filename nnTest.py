@@ -11,7 +11,7 @@ model.fc = nn.Sequential(
 )
 
 # Load the saved model weights
-model_path = "C:/Users/roach/Desktop/skinner/rete/cose/35 validation.pth"
+model_path = "./trained_model_weights.pth"
 model.load_state_dict(torch.load(model_path))
 
 # Set the model to evaluation mode

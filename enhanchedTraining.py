@@ -80,11 +80,16 @@ def main():
     with open(loss_file_path, "w") as loss_file:
         loss_file.write("epoch,train_loss,train_acc,validation_loss,validation_acc\n")
 
+    # Define the directory to save epoch-wise weights
+    weights_dir = "./trained_model_weights"
+    os.makedirs(weights_dir, exist_ok=True)
+
     def train_model_with_scheduler(
-        model, criterion, optimizer, scheduler, num_epochs, loss_file_path
+        model, criterion, optimizer, scheduler, num_epochs, loss_file_path, weights_dir
     ):
         best_val_acc = 0.0
         best_model_wts = None
+
         for epoch in range(num_epochs):
             print(f"Epoch {epoch + 1}/{num_epochs}")
 
@@ -123,23 +128,6 @@ def main():
                         all_labels.extend(labels.cpu().numpy())
                         all_preds.extend(preds.cpu().numpy())
 
-                if phase == "validation":
-                    scheduler.step(val_acc)
-
-                    # Save the best model based on validation accuracy
-                    if val_acc > best_val_acc:
-                        best_val_acc = val_acc
-                        best_model_wts = model.state_dict()
-
-                    # Print classification report and confusion matrix
-                    class_report = classification_report(
-                        all_labels, all_preds, zero_division=1
-                    )
-                    print(f"Classification Report:\n{class_report}")
-
-                    conf_matrix = confusion_matrix(all_labels, all_preds)
-                    print(f"Confusion Matrix:\n{conf_matrix}")
-
                 epoch_loss = running_loss / (count * BATCH_SIZE)
                 epoch_acc = running_corrects.float() / (count * BATCH_SIZE)
 
@@ -150,6 +138,22 @@ def main():
                     val_loss = epoch_loss
                     val_acc = epoch_acc
 
+                    # Save the model weights after each epoch
+                    epoch_weights_path = os.path.join(weights_dir, f"epoch_{epoch + 1}.pth")
+                    torch.save(model.state_dict(), epoch_weights_path)
+
+                    # Save the best model based on validation accuracy
+                    if val_acc > best_val_acc:
+                        best_val_acc = val_acc
+                        best_model_wts = model.state_dict()
+
+                    # Print classification report and confusion matrix
+                    class_report = classification_report(all_labels, all_preds, zero_division=1)
+                    print(f"Classification Report:\n{class_report}")
+
+                    conf_matrix = confusion_matrix(all_labels, all_preds)
+                    print(f"Confusion Matrix:\n{conf_matrix}")
+
                 print(f"{phase} loss: {epoch_loss:.4f}, acc: {epoch_acc:.4f}")
                 print(f"Current learning rate: {optimizer.param_groups[0]['lr']}")
 
@@ -159,15 +163,13 @@ def main():
                         f"{epoch},{train_loss:.6f},{train_acc:.6f},{val_loss:.6f},{val_acc:.6f}\n"
                     )
 
+            scheduler.step(val_acc)  # Move this line outside the validation phase
+
         return best_model_wts
 
-    # Train the model with the scheduler
-    best_model_weights = train_model_with_scheduler(
-        model, criterion, optimizer, scheduler, num_epochs=40, loss_file_path=loss_file_path
+    train_model_with_scheduler(
+        model, criterion, optimizer, scheduler, num_epochs=40, loss_file_path=loss_file_path, weights_dir=weights_dir
     )
-
-    # Save the best model weights
-    torch.save(best_model_weights, "./trained_model_weights.pth")
 
 if __name__ == '__main__':
     main()
